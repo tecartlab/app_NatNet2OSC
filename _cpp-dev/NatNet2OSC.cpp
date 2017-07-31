@@ -231,10 +231,10 @@ SOCKET CreateCommandSocket(unsigned long IP_Address, unsigned short uPort)
 int main(int argc, char* argv[])
 {
 	if((argc < 2) || (argc > 5)){
-		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)> [verbose] [legacy]\n");
+		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> [verbose] [legacy]\n");
     } 
 
-	printf("\n---- NatNet2OSC v. 1.0         ----");
+	printf("\n---- NatNet2OSC v. 1.1         ----");
 	printf("\n---- 20141002 by maybites      ----");
 	printf("\n----    based on code by jasch ----\n");
 
@@ -253,18 +253,55 @@ int main(int argc, char* argv[])
         return 0;
     }
 
+	// OSC address
+	char szLocaIPAddress[128] = "";
+	if (argc>1) {
+		OSCIP = &argv[1][0];	// specified on command line
+	}
+	else {
+		GetLocalIPAddresses((unsigned long *)&LocalAddress, 1);
+		sprintf_s(szLocaIPAddress, "%d.%d.%d.%d", LocalAddress.S_un.S_un_b.s_b1, LocalAddress.S_un.S_un_b.s_b2, LocalAddress.S_un.S_un_b.s_b3, LocalAddress.S_un.S_un_b.s_b4);
+		OSCIP = &szLocaIPAddress[0];
+	}
+
+	// OSC Port
+	if (argc>2) {
+		OSCPort = atoi(argv[2]);
+	}
+
 	// server address
 	GetLocalIPAddresses((unsigned long *)&ServerAddress, 1);
 	sprintf_s(szServerIPAddress, "%d.%d.%d.%d", ServerAddress.S_un.S_un_b.s_b1, ServerAddress.S_un.S_un_b.s_b2, ServerAddress.S_un.S_un_b.s_b3, ServerAddress.S_un.S_un_b.s_b4);
+	printf("Server: %s\n", szServerIPAddress);
 
 	// client address
 	GetLocalIPAddresses((unsigned long *)&MyAddress, 1);
 	sprintf_s(szMyIPAddress, "%d.%d.%d.%d", MyAddress.S_un.S_un_b.s_b1, MyAddress.S_un.S_un_b.s_b2, MyAddress.S_un.S_un_b.s_b3, MyAddress.S_un.S_un_b.s_b4);
+	printf("Client: %s\n", szMyIPAddress);
 
-	MultiCastAddress.S_un.S_addr = inet_addr(MULTICAST_ADDRESS);   
-    printf("Client: %s\n", szMyIPAddress);
-    printf("Server: %s\n", szServerIPAddress);
-    printf("Multicast Group: %s\n", MULTICAST_ADDRESS);
+	// Multicast Address
+	if (argc>3) {
+		MultiCastAddress.S_un.S_addr = inet_addr(argv[3]);	// specified on command line
+		printf("Multicast Group: %s\n", argv[3]);
+	}
+	else {
+		MultiCastAddress.S_un.S_addr = inet_addr(MULTICAST_ADDRESS);
+		printf("Multicast Group: %s\n", MULTICAST_ADDRESS);
+	}
+
+
+
+	// verbose
+	if (argc>4) {
+		verbose = atoi(argv[4]);
+		verbose = (verbose != 0) ? 1 : 0;
+	}
+
+	// legacy
+	if (argc>5) {
+		legacy = atoi(argv[5]);
+		legacy = (legacy != 0) ? 1 : 0;
+	}
 
     // create "Command" socket
     int port = 0;
@@ -363,32 +400,6 @@ int main(int argc, char* argv[])
             break;
     }
 
-	// OSC address
-	char szLocaIPAddress[128] = "";
-	if(argc>1){
-		OSCIP = &argv[1][0];	// specified on command line
-	} else {
-		GetLocalIPAddresses((unsigned long *)&LocalAddress, 1);
-		sprintf_s(szLocaIPAddress, "%d.%d.%d.%d", LocalAddress.S_un.S_un_b.s_b1, LocalAddress.S_un.S_un_b.s_b2, LocalAddress.S_un.S_un_b.s_b3, LocalAddress.S_un.S_un_b.s_b4);		
-		OSCIP =  &szLocaIPAddress[0];
-	}
-
-	// OSC Port
-	if(argc>2){
-		OSCPort = atoi(argv[2]);
-	}
-
-	// verbose
-	if(argc>4){
-		verbose = atoi(argv[3]);
-		verbose = (verbose != 0) ? 1 : 0;
-	}
-
-	// legacy
-	if(argc>4){
-		legacy = atoi(argv[4]);
-		legacy = (legacy != 0) ? 1 : 0;
-	}
 
 	//EU - init UDP socket
 	transmitSocket = new UdpTransmitSocket(IpEndpointName(OSCIP, OSCPort));
