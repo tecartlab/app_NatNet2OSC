@@ -722,11 +722,17 @@ void Unpack(char* pData)
 				printf("ori: [%3.3f,%3.3f,%3.3f,%3.3f]\n", qx,qy,qz,qw);
 			}
 
-			p << osc::BeginMessage("/rigidbody/transform");
+			p << osc::BeginMessage("/rigidbody");
 			p << ID;
+			p << "position";
 			p << x;
 			p << y;
 			p << z;
+			p << osc::EndMessage;
+
+			p << osc::BeginMessage("/rigidbody");
+			p << ID;
+			p << "quat";
 			p << qx;
 			p << qy;
 			p << qz;
