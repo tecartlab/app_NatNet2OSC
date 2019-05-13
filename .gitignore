@@ -1,2 +1,5 @@
 _cpp-dev/Debug/
 _cpp-dev/.vs/
+_cpp-dev/bin/
+_cpp-dev/Release/
+_cpp-dev/x64/

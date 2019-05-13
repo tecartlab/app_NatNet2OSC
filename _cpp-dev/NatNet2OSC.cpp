@@ -107,6 +107,7 @@ in_addr LocalAddress;
 UdpTransmitSocket* transmitSocket;
 char* OSCIP = NULL;
 int OSCPort = 54321;
+int OSCType = 3;
 
 short verbose = 0;
 short legacy = 0;
@@ -231,12 +232,11 @@ SOCKET CreateCommandSocket(unsigned long IP_Address, unsigned short uPort)
 int main(int argc, char* argv[])
 {
 	if((argc < 2) || (argc > 5)){
-		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> [verbose] [legacy]\n");
+		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, max+touch=5, etc]> [verbose] [legacy]\n");
     } 
 
-	printf("\n---- NatNet2OSC v. 1.1         ----");
-	printf("\n---- 20141002 by maybites      ----");
-	printf("\n----    based on code by jasch ----\n");
+	printf("\n---- NatNet2OSC v. 1.2         ----");
+	printf("\n---- 20190513 by maybites      ----\n\n");
 
     int retval;
     char szMyIPAddress[128] = "";
@@ -289,17 +289,21 @@ int main(int argc, char* argv[])
 		printf("Multicast Group: %s\n", MULTICAST_ADDRESS);
 	}
 
-
+	// Multicast Address
+	if (argc > 4) {
+		OSCType = atoi(argv[4]);
+	}
+	printf("OSC type: %d\n", OSCType);
 
 	// verbose
-	if (argc>4) {
-		verbose = atoi(argv[4]);
+	if (argc>5) {
+		verbose = atoi(argv[5]);
 		verbose = (verbose != 0) ? 1 : 0;
 	}
 
 	// legacy
-	if (argc>5) {
-		legacy = atoi(argv[5]);
+	if (argc>6) {
+		legacy = atoi(argv[6]);
 		legacy = (legacy != 0) ? 1 : 0;
 	}
 
@@ -722,22 +726,54 @@ void Unpack(char* pData)
 				printf("ori: [%3.3f,%3.3f,%3.3f,%3.3f]\n", qx,qy,qz,qw);
 			}
 
-			p << osc::BeginMessage("/rigidbody");
-			p << ID;
-			p << "position";
-			p << x;
-			p << y;
-			p << z;
-			p << osc::EndMessage;
+			// output max
+			if (OSCType & 1) {
+				p << osc::BeginMessage("/rigidbody");
+				p << ID;
+				p << "position";
+				p << x;
+				p << y;
+				p << z;
+				p << osc::EndMessage;
 
-			p << osc::BeginMessage("/rigidbody");
-			p << ID;
-			p << "quat";
-			p << qx;
-			p << qy;
-			p << qz;
-			p << qw;
-			p << osc::EndMessage;
+				p << osc::BeginMessage("/rigidbody");
+				p << ID;
+				p << "quat";
+				p << qx;
+				p << qy;
+				p << qz;
+				p << qw;
+				p << osc::EndMessage;
+			}
+			if (OSCType & 2) {
+				sprintf(ns, "/rigidbody/%d/position", ID);
+				p << osc::BeginMessage(ns);
+				p << x;
+				p << y;
+				p << z;
+				p << osc::EndMessage;
+
+				sprintf(ns, "/rigidbody/%d/quat", ID);
+				p << osc::BeginMessage(ns);
+				p << qx;
+				p << qy;
+				p << qz;
+				p << qw;
+				p << osc::EndMessage;
+			}
+			if (OSCType & 4) {
+				sprintf(ns, "/rigidbody/%d/transformation", ID);
+				p << osc::BeginMessage(ns);
+				p << x;
+				p << y;
+				p << z;
+				p << qx;
+				p << qy;
+				p << qz;
+				p << qw;
+				p << osc::EndMessage;
+			}
+
 
             // associated marker positions
             int nRigidMarkers = 0;  memcpy(&nRigidMarkers, ptr, 4); ptr += 4;
@@ -770,19 +806,41 @@ void Unpack(char* pData)
                     bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
                 }
 
+				if (OSCType & 1) {
+					p << osc::BeginMessage("/rigidbody/marker/count");
+					p << ID;
+					p << nRigidMarkers;
+					p << osc::EndMessage;
+				}
+				if (OSCType & 2 || OSCType & 4) {
+					sprintf(ns, "/rigidbody/%d/marker/count", ID);
+					p << osc::BeginMessage(ns);
+					p << nRigidMarkers;
+					p << osc::EndMessage;
+				}
+
                 for(int k=0; k < nRigidMarkers; k++)
                 {
                     if(verbose) printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.3f,%3.3f,%3.3f]\n", k, markerIDs[k], markerSizes[k], markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
  
-					p << osc::BeginMessage("/rigidbody/marker/position");		
-					p << ID;
-					p << nRigidMarkers;
-					p << k;
-					p << markerData[k*3];
-					p << markerData[k*3+1];
-					p << markerData[k*3+2];
-					p << osc::EndMessage;
-               }
+					if (OSCType & 1) {
+						p << osc::BeginMessage("/rigidbody/marker/position");
+						p << ID;
+						p << k;
+						p << markerData[k * 3];
+						p << markerData[k * 3 + 1];
+						p << markerData[k * 3 + 2];
+						p << osc::EndMessage;
+					}
+					if (OSCType & 2 || OSCType & 4) {
+						sprintf(ns, "/rigidbody/%d/marker/%d/position", ID, k);
+						p << osc::BeginMessage(ns);
+						p << markerData[k * 3];
+						p << markerData[k * 3 + 1];
+						p << markerData[k * 3 + 2];
+						p << osc::EndMessage;
+					}
+				}
 
                 if(markerIDs)
                     free(markerIDs);
@@ -792,19 +850,41 @@ void Unpack(char* pData)
             }
             else
             {
-                for(int k=0; k < nRigidMarkers; k++)
-                {
-					if(verbose) printf("\tMarker %d: pos = [%3.2f,%3.2f,%3.2f]\n", k, markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
- 					
-					p << osc::BeginMessage("/rigidbody/marker/position");		
+				if (OSCType & 1) {
+					p << osc::BeginMessage("/rigidbody/marker/count");
 					p << ID;
 					p << nRigidMarkers;
-					p << k;
-					p << markerData[k*3];
-					p << markerData[k*3+1];
-					p << markerData[k*3+2];
 					p << osc::EndMessage;
-              }
+				}
+				if (OSCType & 2 || OSCType & 4) {
+					sprintf(ns, "/rigidbody/%d/marker/count", ID);
+					p << osc::BeginMessage(ns);
+					p << nRigidMarkers;
+					p << osc::EndMessage;
+				}
+				
+				for(int k=0; k < nRigidMarkers; k++)
+                {
+					if(verbose) printf("\tMarker %d: pos = [%3.2f,%3.2f,%3.2f]\n", k, markerData[k*3], markerData[k*3+1],markerData[k*3+2]);
+ 
+					if (OSCType & 1) {
+						p << osc::BeginMessage("/rigidbody/marker/position");
+						p << ID;
+						p << k;
+						p << markerData[k * 3];
+						p << markerData[k * 3 + 1];
+						p << markerData[k * 3 + 2];
+						p << osc::EndMessage;
+					}
+					if (OSCType & 2 || OSCType & 4) {
+						sprintf(ns, "/rigidbody/%d/marker/%d/position", ID, k);
+						p << osc::BeginMessage(ns);
+						p << markerData[k * 3];
+						p << markerData[k * 3 + 1];
+						p << markerData[k * 3 + 2];
+						p << osc::EndMessage;
+					}
+	            }
             }
             if(markerData)
                 free(markerData);
@@ -846,7 +926,7 @@ void Unpack(char* pData)
                 memcpy(&nRigidBodies, ptr, 4); ptr += 4;
                 if(verbose) printf("Rigid Body Count : %d\n", nRigidBodies);
 
-				sprintf(ns,"/skeleton/%d/rigidbody/count", j);
+				sprintf(ns, "/skeleton/%d/rigidbody/count", j);
 				p << osc::BeginMessage(ns);
 				p << nRigidBodies;
 				p << osc::EndMessage;
@@ -874,7 +954,7 @@ void Unpack(char* pData)
 					p << ID;
 					p << osc::EndMessage;
 
-					sprintf(ns,"/skeleton/%d/rigidbody/%d/position",j, i);
+					sprintf(ns, "/skeleton/%d/rigidbody/%d/position", j, i);
 					p << osc::BeginMessage(ns);
 					p << x;
 					p << y;
