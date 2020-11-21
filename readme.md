@@ -30,6 +30,7 @@ If Motive is streaming with the UpAxis = yUp you can transform it to zUp by sett
 streaming the following messages are sent depending on the OSC Mode
 
 + /frame/start \<frameNumber>
++ /frame/timestamp \<secondsSinceDayStarted(float)>
 
 MAX/MSP: OSC MODE = 1
 
@@ -37,9 +38,9 @@ MAX/MSP: OSC MODE = 1
 + /rigidbody \<rigidbodyID> position \<x> \<y> \<z>
 + /rigidbody \<rigidbodyID> quat \<qx> \<qy> \<qz> \<qw>
 
-+ /skeleton/bone \<skleletonName> \<boneID> position \<x> \<y> \<z>
-+ /skeleton/bone \<skleletonName> \<boneID> quat \<qx> \<qy> \<qz> \<qw>
-+ /skeleton/joint \<skleletonName> \<boneID> quat \<qx> \<qy> \<qz> \<qw>
++ /skeleton/bone \<skleletonID> \<boneID> position \<x> \<y> \<z>
++ /skeleton/bone \<skleletonID> \<boneID> quat \<qx> \<qy> \<qz> \<qw>
++ /skeleton/joint \<skleletonID> \<boneID> quat \<qx> \<qy> \<qz> \<qw>
 
 ISADORA: OSC MODE = 2
 
@@ -47,17 +48,22 @@ ISADORA: OSC MODE = 2
 + /rigidbody/\<rigidbodyID>/position \<x> \<y> \<z>
 + /rigidbody/\<rigidbodyID>/quat \<qx> \<qy> \<qz> \<qw>
 
-+ /skeleton/\<skleletonName>/bone/\<boneID>/position \<x> \<y> \<z>
-+ /skeleton/\<skleletonName>/bone/\<boneID>/quat \<qx> \<qy> \<qz> \q<w>
-+ /skeleton/\<skleletonName>/joint/\<boneID>/quat \<qx> \<qy> \<qz> \<qw>
++ /skeleton/\<skleletonID>/bone/\<boneID>/position \<x> \<y> \<z>
++ /skeleton/\<skleletonID>/bone/\<boneID>/quat \<qx> \<qy> \<qz> \q<w>
++ /skeleton/\<skleletonID>/joint/\<boneID>/quat \<qx> \<qy> \<qz> \<qw>
 
 TouchDesigner: OSC MODE = 4
 
 + /rigidbody/\<rigidbodyID>/tracked \<0/1>
 + /rigidbody/\<rigidbodyID>/transformation \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
 
-+ /skeleton/\<skleletonName>/bone/\<boneID>/transformation \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
-+ /skeleton/\<skleletonName>/joint/\<boneID>/quat \<x> \<y> \<z> \<w>
++ /skeleton/\<skleletonID>/bone/\<boneID>/transformation \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /skeleton/\<skleletonID>/joint/\<boneID>/quat \<x> \<y> \<z> \<w>
+
+SPARCK: OSC MODE = 8
+
++ /rb \<rigidbodyID> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /skel \<skleletonID> \<boneID> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
 
 IF you want to have multiple modes, set the oscmode for "max and isadora (1+2)" to 3 or "isadora and touch (2+4)" to 6
 
