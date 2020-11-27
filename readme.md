@@ -30,7 +30,12 @@ If Motive is streaming with the UpAxis = yUp you can transform it to zUp by sett
 streaming the following messages are sent depending on the OSC Mode
 
 + /frame/start \<frameNumber>
-+ /frame/timestamp \<secondsSinceDayStarted(float)>
++ /frame/timestamp \<ms since Day Started(float)>
+
+in case of SPARCK: OSC MODE = 8
++ /f/s \<frameNumber>
++ /f/t \<ms since Day Started(float)>
+
 
 MAX/MSP: OSC MODE = 1
 
@@ -62,14 +67,19 @@ TouchDesigner: OSC MODE = 4
 
 SPARCK: OSC MODE = 8
 
-+ /rb \<rigidbodyID> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
-+ /skel \<skleletonID> \<boneID> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /rb \<rigidbodyID> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /rb/mk \<rigidbodyID> \<markerId> \<x> \<y> \<z>
++ /skel \<skleletonID> \<boneID> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /f/e \<frameNumber>
 
 IF you want to have multiple modes, set the oscmode for "max and isadora (1+2)" to 3 or "isadora and touch (2+4)" to 6
 
 At the end of the frame the frameend message is sent
 
 + /frame/end \<frameNumber>
+
+in case of SPARCK: OSC MODE = 8
++ /f/e \<frameNumber>
 
 
 Building

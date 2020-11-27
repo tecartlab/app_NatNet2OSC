@@ -602,7 +602,7 @@ void Unpack(char* pData)
 	ns = _getOSCTimeStamp();
 	// new for OSC
 	char* ts = _getOSCTimeStamp();
-	float timestamp = (float)atoi(ts) / 1000.0;
+	float timestamp = (float)atoi(ts);
 
 	char buffer[(sizeof(sFrameOfMocapData))];
 	osc::OutboundPacketStream p(buffer, sizeof(sFrameOfMocapData));
@@ -623,30 +623,38 @@ void Unpack(char* pData)
 	
     if(MessageID == 7)      // FRAME OF MOCAP DATA packet
     {
-		p << osc::BeginMessage("/frame/start");
-		p << osc::EndMessage;
+		// frame number
+		int frameNumber = 0; memcpy(&frameNumber, ptr, 4); ptr += 4;
+		if (verbose) printf("Frame # : %d\n", frameNumber);
 
-		p << osc::BeginMessage("/frame/timestamp");
-		p << timestamp;
-		p << osc::EndMessage;
+		if (OSCType != 8) {
+			p << osc::BeginMessage("/frame/start");
+			p << frameNumber;
+			p << osc::EndMessage;
 
+			p << osc::BeginMessage("/frame/timestamp");
+			p << timestamp;
+			p << osc::EndMessage;
+		}
+		else {
+			p << osc::BeginMessage("/f/s");
+			p << frameNumber;
+			p << osc::EndMessage;
 
-        // frame number
-        int frameNumber = 0; memcpy(&frameNumber, ptr, 4); ptr += 4;
-        if(verbose) printf("Frame # : %d\n", frameNumber);
-
-		p << osc::BeginMessage("/frame/number");
-		p << frameNumber;
-		p << osc::EndMessage;
+			p << osc::BeginMessage("/f/t");
+			p << timestamp;
+			p << osc::EndMessage;
+		}
     	
-
 		// number of data sets (markersets, rigidbodies, etc)
 		int nMarkerSets = 0; memcpy(&nMarkerSets, ptr, 4); ptr += 4;
 		if (verbose) printf("Marker Set Count : %d\n", nMarkerSets);
 
-		p << osc::BeginMessage("/markerset/count");
-		p << nMarkerSets;
-		p << osc::EndMessage;
+		if (OSCType != 8) { //not for sparck
+			p << osc::BeginMessage("/markerset/count");
+			p << nMarkerSets;
+			p << osc::EndMessage;
+		}
 
 		for (int i = 0; i < nMarkerSets; i++)
 		{
@@ -711,31 +719,32 @@ void Unpack(char* pData)
 		if(verbose) printf("Unidentified Marker Count : %d\n", nOtherMarkers);
 		
 		if (OSCType != 8) { //not for sparck
-
 			p << osc::BeginMessage("/othermarker/count");
 			p << nOtherMarkers;
 			p << osc::EndMessage;
+		}
 
-			for (int j = 0; j < nOtherMarkers; j++)
-			{
-				float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
-				float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
-				float z = 0.0f; memcpy(&z, ptr, 4); ptr += 4;
+		for (int j = 0; j < nOtherMarkers; j++)
+		{
+			float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
+			float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
+			float z = 0.0f; memcpy(&z, ptr, 4); ptr += 4;
 
-				float pxt, pyt, pzt, qxt, qyt, qzt, qwt;
-				if (UpAxis == 0) {
-					pxt = x;
-					pyt = y;
-					pzt = z;
-				}
-				else if (UpAxis == 1) {
-					pxt = x;
-					pyt = -z;
-					pzt = y;
-				}
+			float pxt, pyt, pzt, qxt, qyt, qzt, qwt;
+			if (UpAxis == 0) {
+				pxt = x;
+				pyt = y;
+				pzt = z;
+			}
+			else if (UpAxis == 1) {
+				pxt = x;
+				pyt = -z;
+				pzt = y;
+			}
 
-				if (verbose) printf("\tMarker %d : pos = [%3.3f,%3.3f,%3.3f]\n", j, pxt, pyt, pzt);
+			if (verbose) printf("\tMarker %d : pos = [%3.3f,%3.3f,%3.3f]\n", j, pxt, pyt, pzt);
 
+			if (OSCType != 8) { //not for sparck
 				p << osc::BeginMessage("/othermarker");
 				p << j;
 				p << "position";
@@ -751,7 +760,7 @@ void Unpack(char* pData)
         memcpy(&nRigidBodies, ptr, 4); ptr += 4;
         if(verbose) printf("Rigid Body Count : %d\n", nRigidBodies);
 
-		if (OSCType | 8) { //not for sparck
+		if (OSCType != 8) { //not for sparck
 			p << osc::BeginMessage("/rigidbody/count");
 			p << nRigidBodies;
 			p << osc::EndMessage;
@@ -845,6 +854,7 @@ void Unpack(char* pData)
 			if (OSCType & 8) { // for sparck
 				p << osc::BeginMessage("/rb");
 				p << ID;
+				p << timestamp;
 				p << pxt;
 				p << pyt;
 				p << pzt;
@@ -1021,14 +1031,8 @@ void Unpack(char* pData)
 				float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
 				if (verbose) printf("Mean marker error: %3.2f\n", fError);
 
-				if (OSCType & 8) { //for sparck
+				if (OSCType != 8) { //not for sparck
 					p << osc::BeginMessage("/rigidbody/meanerror");
-					p << ID;
-					p << fError;
-					p << osc::EndMessage;
-				}
-				else {
-					p << osc::BeginMessage("/rb/meanerror");
 					p << ID;
 					p << fError;
 					p << osc::EndMessage;
@@ -1062,7 +1066,7 @@ void Unpack(char* pData)
                 memcpy(&nRigidBodies, ptr, 4); ptr += 4;
                 if(verbose) printf("Rigid Body Count : %d\n", nRigidBodies);
 
-				if (OSCType | 8) { // not for sparck
+				if (OSCType != 8) { // not for sparck
 					sprintf(ns, "/skeleton/%d/bones/count", j);
 					p << osc::BeginMessage(ns);
 					p << nRigidBodies;
@@ -1160,6 +1164,7 @@ void Unpack(char* pData)
 						p << osc::BeginMessage("/skel");
 						p << skeletonID;
 						p << ID;
+						p << timestamp;
 						p << pxt;
 						p << pyt;
 						p << pzt;
@@ -1258,9 +1263,11 @@ void Unpack(char* pData)
 			memcpy(&nLabeledMarkers, ptr, 4); ptr += 4;
 			if(verbose) printf("Labeled Marker Count : %d\n", nLabeledMarkers);
 
-			p << osc::BeginMessage("/labeledmarker/count");
-			p << nLabeledMarkers;
-			p << osc::EndMessage;
+			if (OSCType != 8) { // not for sparck
+				p << osc::BeginMessage("/labeledmarker/count");
+				p << nLabeledMarkers;
+				p << osc::EndMessage;
+			}
 
 			for (int j=0; j < nLabeledMarkers; j++)
 			{
@@ -1340,9 +1347,9 @@ void Unpack(char* pData)
         float latency = 0.0f; memcpy(&latency, ptr, 4);	ptr += 4;
 		if(verbose) printf("latency : %3.3f\n", latency);
 
-		p << osc::BeginMessage("/frame/latency");
-		p << latency;
-		p << osc::EndMessage;
+		//p << osc::BeginMessage("/frame/latency");
+		//p << latency;
+		//p << osc::EndMessage;
 
 		// timecode
 		unsigned int timecode = 0; 	memcpy(&timecode, ptr, 4);	ptr += 4;
@@ -1363,9 +1370,16 @@ void Unpack(char* pData)
 
         if(verbose) printf("End Packet\n-------------\n");
 
-		p << osc::BeginMessage("/frame/end");
-		p << osc::EndMessage;
-
+		if (OSCType != 8) {
+			p << osc::BeginMessage("/frame/end");
+			p << frameNumber;
+			p << osc::EndMessage;
+		}
+		else {
+			p << osc::BeginMessage("/f/e");
+			p << frameNumber;
+			p << osc::EndMessage;
+		}
 		transmitSocket->Send(p.Data(), p.Size());
  
 
