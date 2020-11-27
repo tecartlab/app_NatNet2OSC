@@ -639,60 +639,60 @@ void Unpack(char* pData)
 		p << frameNumber;
 		p << osc::EndMessage;
     	
-		if (OSCType | 8) { //not for sparck
 
-			// number of data sets (markersets, rigidbodies, etc)
-			int nMarkerSets = 0; memcpy(&nMarkerSets, ptr, 4); ptr += 4;
-			if (verbose) printf("Marker Set Count : %d\n", nMarkerSets);
+		// number of data sets (markersets, rigidbodies, etc)
+		int nMarkerSets = 0; memcpy(&nMarkerSets, ptr, 4); ptr += 4;
+		if (verbose) printf("Marker Set Count : %d\n", nMarkerSets);
 
-			p << osc::BeginMessage("/markerset/count");
-			p << nMarkerSets;
-			p << osc::EndMessage;
+		p << osc::BeginMessage("/markerset/count");
+		p << nMarkerSets;
+		p << osc::EndMessage;
 
-			for (int i = 0; i < nMarkerSets; i++)
+		for (int i = 0; i < nMarkerSets; i++)
+		{
+			// Markerset name
+			char szName[256];
+			strcpy_s(szName, ptr);
+			int nDataBytes = (int)strlen(szName) + 1;
+			ptr += nDataBytes;
+			if (verbose) printf("Model Name: %s\n", szName);
+
+			//sprintf(ns,"/markerset/%d/name", i);
+			//p << osc::BeginMessage(ns);
+			//p << szName;
+			//p << osc::EndMessage;
+
+			// marker data
+			int nMarkers = 0; memcpy(&nMarkers, ptr, 4); ptr += 4;
+			if (verbose) printf("Marker Count : %d\n", nMarkers);
+
+			//sprintf(ns,"/markerset/%d/count", i);
+			//p << osc::BeginMessage(ns);
+			//p << nMarkers;
+			//p << osc::EndMessage;
+
+			for (int j = 0; j < nMarkers; j++)
 			{
-				// Markerset name
-				char szName[256];
-				strcpy_s(szName, ptr);
-				int nDataBytes = (int)strlen(szName) + 1;
-				ptr += nDataBytes;
-				if (verbose) printf("Model Name: %s\n", szName);
+				float x = 0; memcpy(&x, ptr, 4); ptr += 4;
+				float y = 0; memcpy(&y, ptr, 4); ptr += 4;
+				float z = 0; memcpy(&z, ptr, 4); ptr += 4;
 
-				//sprintf(ns,"/markerset/%d/name", i);
-				//p << osc::BeginMessage(ns);
-				//p << szName;
-				//p << osc::EndMessage;
+				float pxt, pyt, pzt, qxt, qyt, qzt, qwt;
+				if (UpAxis == 0) {
+					pxt = x;
+					pyt = y;
+					pzt = z;
+				}
+				else if (UpAxis == 1) {
+					pxt = x;
+					pyt = -z;
+					pzt = y;
+				}
 
-				// marker data
-				int nMarkers = 0; memcpy(&nMarkers, ptr, 4); ptr += 4;
-				if (verbose) printf("Marker Count : %d\n", nMarkers);
+				if (verbose) printf("\tMarker %d : [x=%3.2f,y=%3.2f,z=%3.2f]\n", j, pxt, pyt, pzt);
 
-				//sprintf(ns,"/markerset/%d/count", i);
-				//p << osc::BeginMessage(ns);
-				//p << nMarkers;
-				//p << osc::EndMessage;
-
-				for (int j = 0; j < nMarkers; j++)
-				{
-					float x = 0; memcpy(&x, ptr, 4); ptr += 4;
-					float y = 0; memcpy(&y, ptr, 4); ptr += 4;
-					float z = 0; memcpy(&z, ptr, 4); ptr += 4;
-
-					float pxt, pyt, pzt, qxt, qyt, qzt, qwt;
-					if (UpAxis == 0) {
-						pxt = x;
-						pyt = y;
-						pzt = z;
-					}
-					else if (UpAxis == 1) {
-						pxt = x;
-						pyt = -z;
-						pzt = y;
-					}
-
-					if (verbose) printf("\tMarker %d : [x=%3.2f,y=%3.2f,z=%3.2f]\n", j, pxt, pyt, pzt);
-
-					//sprintf(ns,"/markerset/%d/marker/%d/position", i, j);
+				//sprintf(ns,"/markerset/%d/marker/%d/position", i, j);
+				if (OSCType != 8) { //not for sparck
 
 					p << osc::BeginMessage("/markerset");
 					p << szName;
@@ -704,16 +704,19 @@ void Unpack(char* pData)
 					p << osc::EndMessage;
 				}
 			}
+		}
 
-			// unidentified markers
-			int nOtherMarkers = 0; memcpy(&nOtherMarkers, ptr, 4); ptr += 4;
-			if(verbose) printf("Unidentified Marker Count : %d\n", nOtherMarkers);
+		// unidentified markers
+		int nOtherMarkers = 0; memcpy(&nOtherMarkers, ptr, 4); ptr += 4;
+		if(verbose) printf("Unidentified Marker Count : %d\n", nOtherMarkers);
 		
+		if (OSCType != 8) { //not for sparck
+
 			p << osc::BeginMessage("/othermarker/count");
 			p << nOtherMarkers;
 			p << osc::EndMessage;
 
-			for(int j=0; j < nOtherMarkers; j++)
+			for (int j = 0; j < nOtherMarkers; j++)
 			{
 				float x = 0.0f; memcpy(&x, ptr, 4); ptr += 4;
 				float y = 0.0f; memcpy(&y, ptr, 4); ptr += 4;
@@ -753,6 +756,7 @@ void Unpack(char* pData)
 			p << nRigidBodies;
 			p << osc::EndMessage;
 		}
+
         for (int j=0; j < nRigidBodies; j++)
         {
             // rigid body pos/ori
@@ -1017,10 +1021,18 @@ void Unpack(char* pData)
 				float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
 				if (verbose) printf("Mean marker error: %3.2f\n", fError);
 
-				p << osc::BeginMessage("/rigidbody/meanerror");
-				p << ID;
-				p << fError;
-				p << osc::EndMessage;
+				if (OSCType & 8) { //for sparck
+					p << osc::BeginMessage("/rigidbody/meanerror");
+					p << ID;
+					p << fError;
+					p << osc::EndMessage;
+				}
+				else {
+					p << osc::BeginMessage("/rb/meanerror");
+					p << ID;
+					p << fError;
+					p << osc::EndMessage;
+				}
 			}
 	
             
@@ -1034,7 +1046,7 @@ void Unpack(char* pData)
             memcpy(&nSkeletons, ptr, 4); ptr += 4;
             if(verbose) printf("Skeleton Count : %d\n", nSkeletons);
 			
-			if (OSCType | 8) { // not for sparck
+			if (OSCType != 8) { // not for sparck
 				p << osc::BeginMessage("/skeleton/count");
 				p << nSkeletons;
 				p << osc::EndMessage;
@@ -1577,8 +1589,6 @@ void Unpack(char* pData)
     {
         printf("Unrecognized Packet Type.\n");
     }
-
-
 }
 
 char* _getOSCTimeStamp(){
