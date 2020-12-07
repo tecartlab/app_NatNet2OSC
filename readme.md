@@ -23,7 +23,11 @@ See License.txt
 Using The Application
 -----------------
 
-Usage:  NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> <verbose [0/1]> <legacy [0/1]>
+**Usage:  NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> <verbose [0/1]> <legacy [0/1]>**
+
+example streaming the 'sparck' mode with transform yUp to zUp:
+
+    NatNet2OSC 192.168.2.2 54321 54322 239.255.42.99 8 1 0 0
 
 If Motive is streaming with the UpAxis = yUp you can transform it to zUp by setting the UpAxis = 1.
 
@@ -81,13 +85,27 @@ At the end of the frame the frameend message is sent
 in case of SPARCK: OSC MODE = 8
 + /f/e \<frameNumber>
 
+### Remote control
+
+sending commands to the \<OscCmndPort> will pass commands to Motive:
+
+the following commands are implemented:
+
+    /motive/command refetch
+
+will return all rigidbodies and skeletons currently streaming
+
++ /motive/rigidbody/id \<rigidbodyName> \<rigidbodyID>
++ /motive/skeleton/id \<skleletonName> \<SkeletonID>
++ /motive/skeleton/id/bone \<skleletonName> \<boneID> \<boneName>
+
 
 Building
 ---------
 
 This code is based on the NatNet SDK from optitrack (http://optitrack.com/downloads/developer-tools.html)
 
-Open the NatNetSamples inside the /Samples - folder and build NatNet2OSC Project
+and http://www.rossbencina.com/code/oscpack
 
 Contribute
 ----------

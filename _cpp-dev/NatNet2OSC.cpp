@@ -58,6 +58,7 @@ Usage [optional]:
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <tchar.h>
 #include <conio.h>
 #include <winsock2.h>
@@ -67,6 +68,8 @@ Usage [optional]:
 
 #include "natnet/NatNetTypes.h"
 #include "osc/OscOutboundPacketStream.h"
+#include "osc/OscReceivedElements.h"
+#include "osc/OscPacketListener.h"
 #include "ip/UdpSocket.h"
 
 #pragma warning( disable : 4996 )
@@ -107,6 +110,7 @@ in_addr LocalAddress;
 UdpTransmitSocket* transmitSocket;
 char* OSCIP = NULL;
 int OSCPort = 54321;
+int OSCCmndPort = 54322;
 int OSCType = 1;
 int UpAxis = 0;
 
@@ -230,14 +234,65 @@ SOCKET CreateCommandSocket(unsigned long IP_Address, unsigned short uPort)
     return sockfd;
 }
 
+class ExamplePacketListener : public osc::OscPacketListener {
+protected:
+
+	virtual void ProcessMessage(const osc::ReceivedMessage& m,
+		const IpEndpointName& remoteEndpoint)
+	{
+		(void)remoteEndpoint; // suppress unused parameter warning
+
+		try {
+			// example of parsing single messages. osc::OsckPacketListener
+			// handles the bundle traversal.
+
+			if (strcmp(m.AddressPattern(), "/motive/command") == 0) {
+				// example #1 -- argument stream interface
+				/*
+				osc::ReceivedMessageArgumentStream args = m.ArgumentStream();
+				bool a1;
+				osc::int32 a2;
+				float a3;
+				const char *a4;
+				args >> a1 >> a2 >> a3 >> a4 >> osc::EndMessage;
+				*/
+				// send NAT_REQUEST_MODELDEF command to server (will respond on the "Command Listener" thread)
+
+				sPacket PacketOut;
+				PacketOut.iMessage = NAT_PING;
+				PacketOut.nDataBytes = 0;
+				int nTries = 3;
+
+				PacketOut.iMessage = NAT_REQUEST_MODELDEF;
+				PacketOut.nDataBytes = 0;
+				nTries = 3;
+				while (nTries--)
+				{
+					int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
+					if (iRet != SOCKET_ERROR)
+						break;
+				}
+
+				//printf("received '/motive/command' message with arguments");
+
+			}
+		}
+		catch (osc::Exception& e) {
+			// any parsing errors such as unexpected argument types, or 
+			// missing arguments get thrown as exceptions.
+			printf("error while parsing message %s: %s", m.AddressPattern(), e.what());
+		}
+	}
+};
+
 int main(int argc, char* argv[])
 {
 	if((argc < 2) || (argc > 5)){
-		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCPort (54321)>  <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, sparck=8, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> [verbose] [legacy]\n");
+		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCSendPort (54321)> <OSCCmndPort (54322)> <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, sparck=8, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> [verbose] [legacy]\n");
     } 
 
-	printf("\n---- NatNet2OSC v. 2.0         ----");
-	printf("\n---- 20201121 by maybites      ----\n\n");
+	printf("\n---- NatNet2OSC v. 8.0         ----");
+	printf("\n---- 20201207 by maybites      ----\n\n");
 
     int retval;
     char szMyIPAddress[128] = "";
@@ -270,6 +325,10 @@ int main(int argc, char* argv[])
 		OSCPort = atoi(argv[2]);
 	}
 
+	if (argc > 3) {
+		OSCCmndPort = atoi(argv[3]);
+	}
+
 	// server address
 	GetLocalIPAddresses((unsigned long *)&ServerAddress, 1);
 	sprintf_s(szServerIPAddress, "%d.%d.%d.%d", ServerAddress.S_un.S_un_b.s_b1, ServerAddress.S_un.S_un_b.s_b2, ServerAddress.S_un.S_un_b.s_b3, ServerAddress.S_un.S_un_b.s_b4);
@@ -281,9 +340,9 @@ int main(int argc, char* argv[])
 	printf("Client: %s\n", szMyIPAddress);
 
 	// Multicast Address
-	if (argc>3) {
-		MultiCastAddress.S_un.S_addr = inet_addr(argv[3]);	// specified on command line
-		printf("Multicast Group: %s\n", argv[3]);
+	if (argc>4) {
+		MultiCastAddress.S_un.S_addr = inet_addr(argv[4]);	// specified on command line
+		printf("Multicast Group: %s\n", argv[4]);
 	}
 	else {
 		MultiCastAddress.S_un.S_addr = inet_addr(MULTICAST_ADDRESS);
@@ -291,14 +350,14 @@ int main(int argc, char* argv[])
 	}
 
 	// Osc type
-	if (argc > 4) {
-		OSCType = atoi(argv[4]);
+	if (argc > 5) {
+		OSCType = atoi(argv[5]);
 	}
 	printf("OSC type: %d\n", OSCType);
 
 	// UpAxis
-	if (argc > 5) {
-		UpAxis = atoi(argv[5]);
+	if (argc > 6) {
+		UpAxis = atoi(argv[6]);
 	}
 	if (UpAxis = 0) {
 		printf("UpAxis: no change\n");
@@ -308,14 +367,14 @@ int main(int argc, char* argv[])
 	}
 
 	// verbose
-	if (argc>6) {
-		verbose = atoi(argv[6]);
+	if (argc>7) {
+		verbose = atoi(argv[7]);
 		verbose = (verbose != 0) ? 1 : 0;
 	}
 
 	// legacy
-	if (argc>7) {
-		legacy = atoi(argv[7]);
+	if (argc>8) {
+		legacy = atoi(argv[8]);
 		legacy = (legacy != 0) ? 1 : 0;
 	}
 
@@ -423,80 +482,24 @@ int main(int argc, char* argv[])
 	if(transmitSocket){
 		printf("OSC Forwarding IP: %s\n", OSCIP);
 		printf("OSC Forwarding Port: %d\n\n", OSCPort);
+		printf("OSC Command listening Port: %d\n\n", OSCCmndPort);
 
 		printf("Ready to stream some OSC...\n\n");
 	}
 
+
+	printf(".. starting OSC listener on %d...\n\n", OSCCmndPort);
+	ExamplePacketListener listener;
+	UdpListeningReceiveSocket s(
+		IpEndpointName(IpEndpointName(OSCIP, OSCCmndPort)),
+		&listener);
+
+
     printf("Packet Client started\n\n");
-    printf("Commands:\ns\tsend data descriptions\nf\tsend frame of data\nt\tsend test request\nq\tquit\n\n");
-    int c;
-    char szRequest[512];
-    bool bExit = false;
-    nTries = 3;
-    while (!bExit)
-    {
-        c =_getch();
-        switch(c)
-        {
-        case 's':
-            // send NAT_REQUEST_MODELDEF command to server (will respond on the "Command Listener" thread)
-            PacketOut.iMessage = NAT_REQUEST_MODELDEF;
-            PacketOut.nDataBytes = 0;
-            nTries = 3;
-            while (nTries--)
-            {
-                int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
-                if(iRet != SOCKET_ERROR)
-                    break;
-            }
-            break;	
-        case 'f':
-            // send NAT_REQUEST_FRAMEOFDATA (will respond on the "Command Listener" thread)
-            PacketOut.iMessage = NAT_REQUEST_FRAMEOFDATA;
-            PacketOut.nDataBytes = 0;
-            nTries = 3;
-            while (nTries--)
-            {
-                int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
-                if(iRet != SOCKET_ERROR)
-                    break;
-            }
-            break;	
-        case 't':
-            // send NAT_MESSAGESTRING (will respond on the "Command Listener" thread)
-            strcpy(szRequest, "TestRequest");
-            PacketOut.iMessage = NAT_REQUEST;
-            PacketOut.nDataBytes = (int)strlen(szRequest) + 1;
-            strcpy(PacketOut.Data.szData, szRequest);
-            nTries = 3;
-            while (nTries--)
-            {
-                int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
-                if(iRet != SOCKET_ERROR)
-                    break;
-            }
-            break;	
-        case 'p':
-            // send NAT_MESSAGESTRING (will respond on the "Command Listener" thread)
-            strcpy(szRequest, "Ping");
-            PacketOut.iMessage = NAT_PING;
-            PacketOut.nDataBytes = (int)strlen(szRequest) + 1;
-            strcpy(PacketOut.Data.szData, szRequest);
-            nTries = 3;
-            while (nTries--)
-            {
-                int iRet = sendto(CommandSocket, (char *)&PacketOut, 4 + PacketOut.nDataBytes, 0, (sockaddr *)&HostAddr, sizeof(HostAddr));
-                if(iRet != SOCKET_ERROR)
-                    break;
-            }
-            break;	
-        case 'q':
-            bExit = true;		
-            break;	
-        default:
-            break;
-        }
-    }
+	printf("OSC Commands to command port: /motive/command -> send data descriptions | CTR-C to quit\n\n");
+	printf("CTR-C to quit\n\n");
+
+	s.RunUntilSigInt();
 
     return 0;
 }
@@ -1386,20 +1389,24 @@ void Unpack(char* pData)
     }
     else if(MessageID == 5) // Data Descriptions
     {
-		p << osc::BeginMessage("/dataset/start");
+		p << osc::BeginMessage("/motive/update/start");
 		p << osc::EndMessage;
 
+		/*
 		p << osc::BeginMessage("/dataset/timestamp");
 		p << timestamp;
 		p << osc::EndMessage;
+		*/
 
         // number of datasets
         int nDatasets = 0; memcpy(&nDatasets, ptr, 4); ptr += 4;
 		if(verbose) printf("Dataset Count : %d\n", nDatasets);
 
+		/*
 		p << osc::BeginMessage("/dataset/count");
 		p << nDatasets;
 		p << osc::EndMessage;
+		*/
 
         for(int i=0; i < nDatasets; i++)
         {
@@ -1411,10 +1418,12 @@ void Unpack(char* pData)
 				printf("Type : %d\n", i, type);
 			}
 
+			/*
 			sprintf(ns,"/dataset/%d/type", i);
 			p << osc::BeginMessage(ns);
 			p << type;
 			p << osc::EndMessage;
+			*/
 
             if(type == 0)   // markerset
             {
@@ -1426,20 +1435,24 @@ void Unpack(char* pData)
 
                 if(verbose) printf("Markerset Name: %s\n", szName);
 
+				/*
 				sprintf(ns,"/dataset/%d/markerset/name", i);
 				p << osc::BeginMessage(ns);
 				p << szName;
 				p << osc::EndMessage;
+				*/
 
         	    // marker data
                 int nMarkers = 0; memcpy(&nMarkers, ptr, 4); ptr += 4;
                 
 				if(verbose) printf("Marker Count : %d\n", nMarkers);
 				
+				/*
 				sprintf(ns,"/dataset/%d/markerset/%s/count", i, szName);
 				p << osc::BeginMessage(ns);
 				p << nMarkers;
 				p << osc::EndMessage;
+				*/
 
                 for(int j=0; j < nMarkers; j++)
                 {
@@ -1450,10 +1463,12 @@ void Unpack(char* pData)
                     
 					if(verbose) printf("Marker Name: %s\n", szName2);
 					
+					/*
 					sprintf(ns,"/dataset/%d/markerset/%s/marker/%d/name",i, szName, j);					
 					p << osc::BeginMessage(ns);
 					p << szName2;
 					p << osc::EndMessage;
+					*/
 
 				}
             }
@@ -1468,74 +1483,95 @@ void Unpack(char* pData)
                     
 					if(verbose) printf("Name: %s\n", szName);
 
-					sprintf(ns,"/dataset/%d/rigidbody/name", i);
+					int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+					int parentID = 0; memcpy(&parentID, ptr, 4); ptr += 4;
+
+					if (verbose) {
+						printf("ID : %d\n", ID);
+						printf("Parent ID : %d\n", parentID);
+					}
+
+					sprintf(ns, "/motive/rigidbody/id");
 					p << osc::BeginMessage(ns);
 					p << szName;
+					p << ID;
 					p << osc::EndMessage;
-               }
 
-                int ID = 0; memcpy(&ID, ptr, 4); ptr +=4;         
-                int parentID = 0; memcpy(&parentID, ptr, 4); ptr +=4;
- 
-				if(verbose){
-					printf("ID : %d\n", ID);
-					printf("Parent ID : %d\n", parentID);
+					/*
+					sprintf(ns, "/dataset/%d/rigidbody/ID", i);
+					p << osc::BeginMessage(ns);
+					p << ID;
+					p << osc::EndMessage;
+
+					sprintf(ns, "/dataset/%d/rigidbody/%d/parentID", i, ID);
+					p << osc::BeginMessage(ns);
+					p << parentID;
+					p << osc::EndMessage;
+					*/
+					
+					float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr += 4;
+					float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr += 4;
+					float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr += 4;
+
+					if (verbose) {
+						printf("X Offset : %3.2f\n", xoffset);
+						printf("Y Offset : %3.2f\n", yoffset);
+						printf("Z Offset : %3.2f\n", zoffset);
+					}
+
+					/*
+					sprintf(ns, "/dataset/%d/rigidbody/%d/offset", i, ID);
+					p << osc::BeginMessage(ns);
+					p << xoffset;
+					p << yoffset;
+					p << zoffset;
+					p << osc::EndMessage;
+					*/
+
 				}
- 
-				sprintf(ns,"/dataset/%d/rigidbody/ID", i);
-				p << osc::BeginMessage(ns);
-				p << ID;
-				p << osc::EndMessage;
-				sprintf(ns,"/dataset/%d/rigidbody/%d/parentID", i, ID);
-				p << osc::BeginMessage(ns);
-				p << parentID;
-				p << osc::EndMessage;
 
-                float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr +=4;
-                float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr +=4;
-				float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr +=4;
-
- 				if(verbose){
-					printf("X Offset : %3.2f\n", xoffset);
-					printf("Y Offset : %3.2f\n", yoffset);
-					printf("Z Offset : %3.2f\n", zoffset);
-				}
-
-				sprintf(ns,"/dataset/%d/rigidbody/%d/offset", i, ID);
-				p << osc::BeginMessage(ns);
-				p << xoffset;
-				p << yoffset;
-				p << zoffset;
-				p << osc::EndMessage;
 
             }
             else if(type ==2)   // skeleton
             {
-                char szName[MAX_NAMELENGTH];
-                strcpy(szName, ptr);
+                char scelName[MAX_NAMELENGTH];
+                strcpy(scelName, ptr);
                 ptr += strlen(ptr) + 1;
-                if(verbose) printf("Name: %s\n", szName);
+                if(verbose) printf("Name: %s\n", scelName);
 
+				/*
 				sprintf(ns,"/dataset/%d/skeleton/name", i);
 				p << osc::BeginMessage(ns);
 				p << szName;
 				p << osc::EndMessage;
+				*/
 
                 int skeletonID = 0; memcpy(&skeletonID, ptr, 4); ptr +=4;
                 if(verbose) printf("ID : %d\n", skeletonID);
 
+				/*
 				sprintf(ns,"/dataset/%d/skeleton/ID", i);
 				p << osc::BeginMessage(ns);
 				p << skeletonID;
 				p << osc::EndMessage;
+				*/
 
                 int nRigidBodies = 0; memcpy(&nRigidBodies, ptr, 4); ptr +=4;
                 if(verbose) printf("RigidBody (Bone) Count : %d\n", nRigidBodies);
 
+				/*
 				sprintf(ns,"/dataset/%d/skeleton/%d/rigidbody/count", i, skeletonID);
 				p << osc::BeginMessage(ns);
 				p << nRigidBodies;
 				p << osc::EndMessage;
+				*/
+
+				sprintf(ns, "/motive/skeleton/id");
+				p << osc::BeginMessage(ns);
+				p << scelName;
+				p << skeletonID;
+				p << osc::EndMessage;
+
 
                 for(int j=0; j< nRigidBodies; j++)
                 {
@@ -1547,53 +1583,67 @@ void Unpack(char* pData)
                         ptr += strlen(ptr) + 1;
                         if(verbose) printf("Rigid Body Name: %s\n", szName);
  					
+						/*
 						sprintf(ns,"/dataset/%d/skeleton/%d/rigidbody/%d/name", i, skeletonID, j);
 						p << osc::BeginMessage(ns);
 						p << szName;
 						p << osc::EndMessage;
+						*/
 
+						int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+						if (verbose) printf("RigidBody ID : %d\n", ID);
+
+						/*
+						sprintf(ns, "/dataset/%d/skeleton/%d/rigidbody/%d/ID", i, skeletonID, j);
+						p << osc::BeginMessage(ns);
+						p << ID;
+						p << osc::EndMessage;
+						*/
+
+						int parentID = 0; memcpy(&parentID, ptr, 4); ptr += 4;
+						if (verbose)  printf("Parent ID : %d\n", parentID);
+
+						/*
+						sprintf(ns, "/dataset/%d/skeleton/%d/rigidbody/%d/parentID", i, skeletonID, j);
+						p << osc::BeginMessage(ns);
+						p << parentID;
+						p << osc::EndMessage;
+						*/
+
+						sprintf(ns, "/motive/skeleton/id/bone");
+						p << osc::BeginMessage(ns);
+						p << scelName;
+						p << ID;
+						p << szName;
+						p << osc::EndMessage;
+
+						float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr += 4;
+						float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr += 4;
+						float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr += 4;
+
+						if (verbose) {
+							printf("X Offset : %3.2f\n", xoffset);
+							printf("Y Offset : %3.2f\n", yoffset);
+							printf("Z Offset : %3.2f\n", zoffset);
+						}
+
+						/*
+						sprintf(ns, "/dataset/%d/skeleton/%d/rigidbody/%d/offset", i, skeletonID, j);
+						p << osc::BeginMessage(ns);
+						p << xoffset;
+						p << yoffset;
+						p << zoffset;
+						p << osc::EndMessage;
+						*/
 					}
-
-                    int ID = 0; memcpy(&ID, ptr, 4); ptr +=4;
-                    if(verbose) printf("RigidBody ID : %d\n", ID);
-
-					sprintf(ns,"/dataset/%d/skeleton/%d/rigidbody/%d/ID", i, skeletonID, j);
-					p << osc::BeginMessage(ns);
-					p << ID;
-					p << osc::EndMessage;
-
-                    int parentID = 0; memcpy(&parentID, ptr, 4); ptr +=4;
-					if(verbose)  printf("Parent ID : %d\n", parentID);
-
-					sprintf(ns,"/dataset/%d/skeleton/%d/rigidbody/%d/parentID", i, skeletonID, j);
-					p << osc::BeginMessage(ns);
-					p << parentID;
-					p << osc::EndMessage;
-
-                    float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr +=4;
-                    float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr +=4;
-                    float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr +=4;
-  					
-					if(verbose) {
-						printf("X Offset : %3.2f\n", xoffset);					
-						printf("Y Offset : %3.2f\n", yoffset);
-						printf("Z Offset : %3.2f\n", zoffset);
-					}
-
-					sprintf(ns,"/dataset/%d/skeleton/%d/rigidbody/%d/offset", i, skeletonID, j);
-					p << osc::BeginMessage(ns);
-					p << xoffset;
-					p << yoffset;
-					p << zoffset;
-					p << osc::EndMessage;
-              }
+	            }
             }
 
         }   // next dataset
 
 		if(verbose) printf("End Packet\n-------------\n");
 
-		p << osc::BeginMessage("/dataset/end");
+		p << osc::BeginMessage("/motive/update/end");
 		p << osc::EndMessage;
 
 		transmitSocket->Send(p.Data(), p.Size());
