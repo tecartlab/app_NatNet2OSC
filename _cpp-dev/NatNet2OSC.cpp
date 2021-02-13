@@ -288,11 +288,11 @@ protected:
 int main(int argc, char* argv[])
 {
 	if((argc < 2) || (argc > 5)){
-		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCSendPort (54321)> <OSCCmndPort (54322)> <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, sparck=8, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> [verbose] [legacy]\n");
+		printf("\nUsage: NatNet2OSC <OSCIP (localIP)> <OSCSendPort (54321)> <OSCCmndPort (54322)> <MultCast (castIP)> <oscMode (max=1, isadora=2, touch=4, sparck=8, ambi=16, max+touch=5, etc]> <UpAxis 0=same, 1=yUp to zUp> [verbose] [legacy]\n");
     } 
 
-	printf("\n---- NatNet2OSC v. 8.0         ----");
-	printf("\n---- 20201207 by maybites      ----\n\n");
+	printf("\n---- NatNet2OSC v. 8.2         ----");
+	printf("\n---- 20210213 by maybites      ----\n\n");
 
     int retval;
     char szMyIPAddress[128] = "";
@@ -857,6 +857,7 @@ void Unpack(char* pData)
 			if (OSCType & 8) { // for sparck
 				p << osc::BeginMessage("/rb");
 				p << ID;
+				p << 2;
 				p << timestamp;
 				p << pxt;
 				p << pyt;
@@ -865,6 +866,15 @@ void Unpack(char* pData)
 				p << qyt;
 				p << qzt;
 				p << qwt;
+				p << osc::EndMessage;
+			}
+			if (OSCType & 16) {
+				sprintf(ns, "/icst/ambi/sourceindex/xyz");
+				p << osc::BeginMessage(ns);
+				p << ID;
+				p << pxt;
+				p << pyt;
+				p << pzt;
 				p << osc::EndMessage;
 			}
 
@@ -948,8 +958,9 @@ void Unpack(char* pData)
 						p << osc::EndMessage;
 					}
 					if (OSCType & 8) {
-						p << osc::BeginMessage("/rb/mk");
+						p << osc::BeginMessage("/rb");
 						p << ID;
+						p << 1;
 						p << k;
 						p << pxt;
 						p << pyt;
@@ -1015,8 +1026,9 @@ void Unpack(char* pData)
 						p << osc::EndMessage;
 					}
 					if (OSCType & 8) {
-						p << osc::BeginMessage("/rb/mk");
+						p << osc::BeginMessage("/rb");
 						p << ID;
+						p << 1;
 						p << k;
 						p << pxt;
 						p << pyt;
@@ -1166,6 +1178,7 @@ void Unpack(char* pData)
 					if (OSCType & 8) { // for sparck
 						p << osc::BeginMessage("/skel");
 						p << skeletonID;
+						p << 10;
 						p << ID;
 						p << timestamp;
 						p << pxt;

@@ -1,4 +1,4 @@
-NatNet2OSC
+NatNet2OSC 8.2
 ===================================
 
 
@@ -71,10 +71,13 @@ TouchDesigner: OSC MODE = 4
 
 SPARCK: OSC MODE = 8
 
-+ /rb \<rigidbodyID> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
-+ /rb/mk \<rigidbodyID> \<markerId> \<x> \<y> \<z>
-+ /skel \<skleletonID> \<boneID> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
-+ /f/e \<frameNumber>
++ /rb \<rigidbodyID> \<datatype = 1> \<markerId> \<x> \<y> \<z>
++ /rb \<rigidbodyID> \<datatype = 2> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
++ /skel \<skleletonID> \<datatype = 10> \<boneID> \<timestamp> \<x> \<y> \<z> \<qx> \<qy> \<qz> \<qw>
+
+AMBI: OSC MODE = 16
+
++ /icst/ambi/sourceindex/xyz \<rigidbodyID> \<x> \<y> \<z>
 
 IF you want to have multiple modes, set the oscmode for "max and isadora (1+2)" to 3 or "isadora and touch (2+4)" to 6
 
@@ -83,6 +86,7 @@ At the end of the frame the frameend message is sent
 + /frame/end \<frameNumber>
 
 in case of SPARCK: OSC MODE = 8
+
 + /f/e \<frameNumber>
 
 ### Remote control
@@ -95,10 +99,11 @@ the following commands are implemented:
 
 will return all rigidbodies and skeletons currently streaming
 
++ /motive/update/start
 + /motive/rigidbody/id \<rigidbodyName> \<rigidbodyID>
 + /motive/skeleton/id \<skleletonName> \<SkeletonID>
 + /motive/skeleton/id/bone \<skleletonName> \<boneID> \<boneName>
-
++ /motive/update/end
 
 Building
 ---------
