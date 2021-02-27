@@ -273,7 +273,7 @@ protected:
 						break;
 				}
 
-				//printf("received '/motive/command' message with arguments");
+				printf("received '/motive/command' message.\n");
 
 			}
 		}
@@ -383,6 +383,8 @@ int main(int argc, char* argv[])
     CommandSocket = CreateCommandSocket(MyAddress.S_un.S_addr,port);
     if(CommandSocket == -1)
     {
+		printf("ERROR: unable to create CommandSocket\n");
+
         // error
     }
     else
@@ -416,7 +418,8 @@ int main(int argc, char* argv[])
     if (retval == SOCKET_ERROR)
     {
         closesocket(DataSocket);
-        return -1;
+		closesocket(CommandSocket);
+		return -1;
     }
 
     struct sockaddr_in MySocketAddr;
@@ -428,7 +431,9 @@ int main(int argc, char* argv[])
     {
 		printf("[NatNet2OSC] bind failed (error: %d)\n", WSAGetLastError());
         WSACleanup();
-        return 0;
+		closesocket(DataSocket);
+		closesocket(CommandSocket);
+		return 0;
     }
     // join multicast group
     struct ip_mreq Mreq;
@@ -439,7 +444,9 @@ int main(int argc, char* argv[])
     {
         printf("[NatNet2OSC] join failed (error: %d)\n", WSAGetLastError());
         WSACleanup();
-        return -1;
+		closesocket(DataSocket);
+		closesocket(CommandSocket);
+		return -1;
     }
 	// create a 1MB buffer
     setsockopt(DataSocket, SOL_SOCKET, SO_RCVBUF, (char *)&optval, 4);
@@ -500,6 +507,10 @@ int main(int argc, char* argv[])
 	printf("CTR-C to quit\n\n");
 
 	s.RunUntilSigInt();
+
+	printf("Unreachable..\n\n");
+	closesocket(DataSocket);
+	closesocket(CommandSocket);
 
     return 0;
 }
@@ -612,23 +623,21 @@ void Unpack(char* pData)
 	
 	p << osc::BeginBundleImmediate;
 
-    if(verbose) printf("Begin Packet\n-------\n");
+    //if(verbose) printf("Begin Packet\n-------\n");
 
     // message ID
     int MessageID = 0;
     memcpy(&MessageID, ptr, 2); ptr += 2;
-	if(verbose) printf("Message ID : %d\n", MessageID);
 
     // size
     int nBytes = 0;
     memcpy(&nBytes, ptr, 2); ptr += 2;
-	if(verbose) printf("Byte count : %d\n", nBytes);
 	
     if(MessageID == 7)      // FRAME OF MOCAP DATA packet
     {
 		// frame number
 		int frameNumber = 0; memcpy(&frameNumber, ptr, 4); ptr += 4;
-		if (verbose) printf("Frame # : %d\n", frameNumber);
+		//if (verbose) printf("Frame # : %d\n", frameNumber);
 
 		if (OSCType != 8) {
 			p << osc::BeginMessage("/frame/start");
@@ -651,7 +660,6 @@ void Unpack(char* pData)
     	
 		// number of data sets (markersets, rigidbodies, etc)
 		int nMarkerSets = 0; memcpy(&nMarkerSets, ptr, 4); ptr += 4;
-		if (verbose) printf("Marker Set Count : %d\n", nMarkerSets);
 
 		if (OSCType != 8) { //not for sparck
 			p << osc::BeginMessage("/markerset/count");
@@ -666,7 +674,6 @@ void Unpack(char* pData)
 			strcpy_s(szName, ptr);
 			int nDataBytes = (int)strlen(szName) + 1;
 			ptr += nDataBytes;
-			if (verbose) printf("Model Name: %s\n", szName);
 
 			//sprintf(ns,"/markerset/%d/name", i);
 			//p << osc::BeginMessage(ns);
@@ -675,7 +682,6 @@ void Unpack(char* pData)
 
 			// marker data
 			int nMarkers = 0; memcpy(&nMarkers, ptr, 4); ptr += 4;
-			if (verbose) printf("Marker Count : %d\n", nMarkers);
 
 			//sprintf(ns,"/markerset/%d/count", i);
 			//p << osc::BeginMessage(ns);
@@ -700,8 +706,6 @@ void Unpack(char* pData)
 					pzt = y;
 				}
 
-				if (verbose) printf("\tMarker %d : [x=%3.2f,y=%3.2f,z=%3.2f]\n", j, pxt, pyt, pzt);
-
 				//sprintf(ns,"/markerset/%d/marker/%d/position", i, j);
 				if (OSCType != 8) { //not for sparck
 
@@ -719,7 +723,6 @@ void Unpack(char* pData)
 
 		// unidentified markers
 		int nOtherMarkers = 0; memcpy(&nOtherMarkers, ptr, 4); ptr += 4;
-		if(verbose) printf("Unidentified Marker Count : %d\n", nOtherMarkers);
 		
 		if (OSCType != 8) { //not for sparck
 			p << osc::BeginMessage("/othermarker/count");
@@ -745,8 +748,7 @@ void Unpack(char* pData)
 				pzt = y;
 			}
 
-			if (verbose) printf("\tMarker %d : pos = [%3.3f,%3.3f,%3.3f]\n", j, pxt, pyt, pzt);
-
+			
 			if (OSCType != 8) { //not for sparck
 				p << osc::BeginMessage("/othermarker");
 				p << j;
@@ -761,7 +763,6 @@ void Unpack(char* pData)
         // rigid bodies
         int nRigidBodies = 0;
         memcpy(&nRigidBodies, ptr, 4); ptr += 4;
-        if(verbose) printf("Rigid Body Count : %d\n", nRigidBodies);
 
 		if (OSCType != 8) { //not for sparck
 			p << osc::BeginMessage("/rigidbody/count");
@@ -799,12 +800,6 @@ void Unpack(char* pData)
 				qyt = -qz;
 				qzt = qy;
 				qwt = qw;
-			}
-
-			if (verbose) {
-				printf("ID : %d\n", ID);
-				printf("pos: [%3.3f,%3.3f,%3.3f]\n", pxt, pyt, pzt);
-				printf("ori: [%3.3f,%3.3f,%3.3f,%3.3f]\n", qxt, qyt, qzt, qwt);
 			}
 
 			// output max
@@ -881,7 +876,6 @@ void Unpack(char* pData)
 
 			// associated marker positions
 			int nRigidMarkers = 0;  memcpy(&nRigidMarkers, ptr, 4); ptr += 4;
-			if (verbose)printf("Marker Count: %d\n", nRigidMarkers);
 
 			int nBytes = nRigidMarkers * 3 * sizeof(float);
 			float* markerData = (float*)malloc(nBytes);
@@ -936,8 +930,6 @@ void Unpack(char* pData)
 						pyt = -markerData[k * 3 + 2];
 						pzt = markerData[k * 3 + 1];
 					}
-
-					if (verbose) printf("\tMarker %d: id=%d\tsize=%3.1f\tpos=[%3.3f,%3.3f,%3.3f]\n", k, markerIDs[k], markerSizes[k], pxt, pyt, pzt);
 
 					if (OSCType & 1) {
 						p << osc::BeginMessage("/rigidbody/marker");
@@ -1005,8 +997,6 @@ void Unpack(char* pData)
 						pzt = markerData[k * 3 + 1];
 					}
 
-					if (verbose) printf("\tMarker %d: pos = [%3.2f,%3.2f,%3.2f]\n", k, pxt, pyt, pzt);
-
 					if (OSCType & 1) {
 						p << osc::BeginMessage("/rigidbody/marker");
 						p << ID;
@@ -1044,7 +1034,6 @@ void Unpack(char* pData)
 			{
 				// Mean marker error
 				float fError = 0.0f; memcpy(&fError, ptr, 4); ptr += 4;
-				if (verbose) printf("Mean marker error: %3.2f\n", fError);
 
 				if (OSCType != 8) { //not for sparck
 					p << osc::BeginMessage("/rigidbody/meanerror");
@@ -1063,7 +1052,6 @@ void Unpack(char* pData)
         {
             int nSkeletons = 0;
             memcpy(&nSkeletons, ptr, 4); ptr += 4;
-            if(verbose) printf("Skeleton Count : %d\n", nSkeletons);
 			
 			if (OSCType != 8) { // not for sparck
 				p << osc::BeginMessage("/skeleton/count");
@@ -1079,7 +1067,6 @@ void Unpack(char* pData)
                 // # of rigid bodies (bones) in skeleton
                 int nRigidBodies = 0;
                 memcpy(&nRigidBodies, ptr, 4); ptr += 4;
-                if(verbose) printf("Rigid Body Count : %d\n", nRigidBodies);
 
 				if (OSCType != 8) { // not for sparck
 					sprintf(ns, "/skeleton/%d/bones/count", j);
@@ -1118,12 +1105,6 @@ void Unpack(char* pData)
 						qyt = -qz;
 						qzt = qy;
 						qwt = qw;
-					}
-
-					if(verbose){
-	                    printf("ID : %d\n", ID);
-		                printf("pos: [%3.2f,%3.2f,%3.2f]\n", pxt,pyt, pzt);
-			            printf("ori: [%3.2f,%3.2f,%3.2f,%3.2f]\n", qxt,qyt,qzt,qwt);
 					}
 
 					// output max
@@ -1277,7 +1258,6 @@ void Unpack(char* pData)
 		{
 			int nLabeledMarkers = 0;
 			memcpy(&nLabeledMarkers, ptr, 4); ptr += 4;
-			if(verbose) printf("Labeled Marker Count : %d\n", nLabeledMarkers);
 
 			if (OSCType != 8) { // not for sparck
 				p << osc::BeginMessage("/labeledmarker/count");
@@ -1307,12 +1287,6 @@ void Unpack(char* pData)
                     bool bPCSolved = params & 0x02;     // position provided by point cloud solve
                     bool bModelSolved = params & 0x04;  // position provided by model solve
                 }
-
-				if(verbose){
-					printf("ID  : %d\n", ID);
-					printf("pos : [%3.2f,%3.2f,%3.2f]\n", x,y,z);
-					printf("size: [%3.2f]\n", size);
-				}
 
 				float pxt, pyt, pzt, qxt, qyt, qzt, qwt;
 				if (UpAxis == 0) {
@@ -1361,7 +1335,6 @@ void Unpack(char* pData)
 
 		// latency
         float latency = 0.0f; memcpy(&latency, ptr, 4);	ptr += 4;
-		if(verbose) printf("latency : %3.3f\n", latency);
 
 		//p << osc::BeginMessage("/frame/latency");
 		//p << latency;
@@ -1384,8 +1357,6 @@ void Unpack(char* pData)
 		// end of data tag
         int eod = 0; memcpy(&eod, ptr, 4); ptr += 4;
 
-        if(verbose) printf("End Packet\n-------------\n");
-
 		if (OSCType != 8) {
 			p << osc::BeginMessage("/frame/end");
 			p << frameNumber;
@@ -1402,6 +1373,8 @@ void Unpack(char* pData)
     }
     else if(MessageID == 5) // Data Descriptions
     {
+		printf("Start sending: Data Descriptions...\n");
+
 		p << osc::BeginMessage("/motive/update/start");
 		p << osc::EndMessage;
 
@@ -1428,7 +1401,7 @@ void Unpack(char* pData)
 
 			if(verbose){
 				printf("Dataset %d\n", i);
-				printf("Type : %d\n", i, type);
+				printf("Type : %d\n", type);
 			}
 
 			/*
@@ -1487,61 +1460,59 @@ void Unpack(char* pData)
             }
             else if(type ==1)   // rigid body
             {
-                if(major >= 2)
-                {
-                    // name
-                    char szName[MAX_NAMELENGTH];
-                    strcpy(szName, ptr);
-                    ptr += strlen(ptr) + 1;
+				printf("major : %d\n", major);
+
+                // name
+                char szName[MAX_NAMELENGTH];
+                strcpy(szName, ptr);
+                ptr += strlen(ptr) + 1;
                     
-					if(verbose) printf("Name: %s\n", szName);
+				if(verbose) printf("Name: %s\n", szName);
 
-					int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
-					int parentID = 0; memcpy(&parentID, ptr, 4); ptr += 4;
+				int ID = 0; memcpy(&ID, ptr, 4); ptr += 4;
+				int parentID = 0; memcpy(&parentID, ptr, 4); ptr += 4;
 
-					if (verbose) {
-						printf("ID : %d\n", ID);
-						printf("Parent ID : %d\n", parentID);
-					}
-
-					sprintf(ns, "/motive/rigidbody/id");
-					p << osc::BeginMessage(ns);
-					p << szName;
-					p << ID;
-					p << osc::EndMessage;
-
-					/*
-					sprintf(ns, "/dataset/%d/rigidbody/ID", i);
-					p << osc::BeginMessage(ns);
-					p << ID;
-					p << osc::EndMessage;
-
-					sprintf(ns, "/dataset/%d/rigidbody/%d/parentID", i, ID);
-					p << osc::BeginMessage(ns);
-					p << parentID;
-					p << osc::EndMessage;
-					*/
-					
-					float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr += 4;
-					float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr += 4;
-					float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr += 4;
-
-					if (verbose) {
-						printf("X Offset : %3.2f\n", xoffset);
-						printf("Y Offset : %3.2f\n", yoffset);
-						printf("Z Offset : %3.2f\n", zoffset);
-					}
-
-					/*
-					sprintf(ns, "/dataset/%d/rigidbody/%d/offset", i, ID);
-					p << osc::BeginMessage(ns);
-					p << xoffset;
-					p << yoffset;
-					p << zoffset;
-					p << osc::EndMessage;
-					*/
-
+				if (verbose) {
+					printf("ID : %d\n", ID);
+					printf("Parent ID : %d\n", parentID);
 				}
+
+				sprintf(ns, "/motive/rigidbody/id");
+				p << osc::BeginMessage(ns);
+				p << szName;
+				p << ID;
+				p << osc::EndMessage;
+
+				/*
+				sprintf(ns, "/dataset/%d/rigidbody/ID", i);
+				p << osc::BeginMessage(ns);
+				p << ID;
+				p << osc::EndMessage;
+
+				sprintf(ns, "/dataset/%d/rigidbody/%d/parentID", i, ID);
+				p << osc::BeginMessage(ns);
+				p << parentID;
+				p << osc::EndMessage;
+				*/
+					
+				float xoffset = 0; memcpy(&xoffset, ptr, 4); ptr += 4;
+				float yoffset = 0; memcpy(&yoffset, ptr, 4); ptr += 4;
+				float zoffset = 0; memcpy(&zoffset, ptr, 4); ptr += 4;
+
+				if (verbose) {
+					printf("X Offset : %3.2f\n", xoffset);
+					printf("Y Offset : %3.2f\n", yoffset);
+					printf("Z Offset : %3.2f\n", zoffset);
+				}
+
+				/*
+				sprintf(ns, "/dataset/%d/rigidbody/%d/offset", i, ID);
+				p << osc::BeginMessage(ns);
+				p << xoffset;
+				p << yoffset;
+				p << zoffset;
+				p << osc::EndMessage;
+				*/
 
 
             }
@@ -1660,7 +1631,9 @@ void Unpack(char* pData)
 		p << osc::EndMessage;
 
 		transmitSocket->Send(p.Data(), p.Size());
- 
+
+		printf(".... sending data descriptions: DONE\n");
+
     }
     else
     {
